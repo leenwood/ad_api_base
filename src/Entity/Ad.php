@@ -116,7 +116,12 @@ class Ad
         $this->author = $author;
     }
 
-    public function addNewAd(array $input): void
+    /**
+     * Обновляет информацию полям title, description, author
+     * @param array $input
+     * @return void
+     */
+    public function addNewValue(array $input): void
     {
         foreach ($input as $key => $value)
         {

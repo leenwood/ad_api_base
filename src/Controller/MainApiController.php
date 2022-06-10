@@ -32,7 +32,7 @@ class MainApiController extends AbstractController
         $JsonInput = json_decode($request->getContent(), true);
 
 
-        $ad->addNewAd($JsonInput);
+        $ad->addNewValue($JsonInput);
         $ad->setDatePost(time());
         $adValidator = new AdValidator($ad);
         if($adValidator->isValid())
@@ -42,7 +42,8 @@ class MainApiController extends AbstractController
             return $this->json([
                 'result' => 'success',
                 'message' => '',
-                'date' => date('d-m-Y')
+                'date' => date('d-m-Y'),
+                'inputValue' => $JsonInput
             ]);
         }
         else
@@ -50,7 +51,8 @@ class MainApiController extends AbstractController
             return $this->json([
                 'result' => 'error',
                 'message' => $adValidator->message(),
-                'date' => date('d-m-Y')
+                'date' => date('d-m-Y'),
+                'inputValue' => $JsonInput
             ]);
         }
     }
@@ -69,18 +71,105 @@ class MainApiController extends AbstractController
             return $this->json([
                 'result' => 'error',
                 'message' => sprintf("Not found ad with id: %s", $id),
-                'date' => date('d-m-Y')
+                'date' => date('d-m-Y'),
+                'inputValue' => ['id' => $id]
             ]);
         }
+        $oldVersion = $ad;
         $JsonInput = json_decode($request->getContent(), true);
+        $ad->addNewValue($JsonInput);
 
-        $ad->addNewAd($JsonInput);
-        $this->getDoctrine()->getManager()->persist($ad);
-        $this->getDoctrine()->getManager()->flush($ad);
+        $adValidator = new AdValidator($ad);
+        if($adValidator->isValid())
+        {
+            $this->getDoctrine()->getManager()->persist($ad);
+            $this->getDoctrine()->getManager()->flush($ad);
+            return $this->json([
+                'result' => 'success',
+                'message' => '',
+                'date' => date('d-m-Y'),
+                'inputValue' => $JsonInput,
+                'oldVersion' => $oldVersion
+            ]);
+        }
+        else
+        {
+            $ad->addNewAd($JsonInput);
+            $this->getDoctrine()->getManager()->persist($ad);
+            $this->getDoctrine()->getManager()->flush($ad);
+            return $this->json([
+                'result' => 'error',
+                'message' => $adValidator->message(),
+                'date' => date('d-m-Y'),
+                'inputValue' => $JsonInput,
+                'oldVersion' => $oldVersion
+            ]);
+        }
+    }
+
+    /**
+     * @Route("/api/ads", name="ads_list", methods={"GET"})
+     */
+    public function showAllAd(): Response
+    {
+        $ads = $this->getDoctrine()
+            ->getManager()
+            ->getRepository(Ad::class)
+            ->findAll();
+
+        return $this->json($ads);
+    }
+
+    /**
+     * @Route("/api/ad/{id}", name="ad_byId", methods={"GET"})
+     */
+    public function showAd(Request $request, $id): Response
+    {
+        $ad = $this->getDoctrine()
+            ->getManager()
+            ->getRepository(Ad::class)
+            ->findOneBy(['id' => $id]);
+        if ($ad === null)
+        {
+            return $this->json([
+                'result' => 'error',
+                'message' => sprintf("Not found ad with id: %s", $id),
+                'date' => date('d-m-Y'),
+                'inputValue' => ['id' => $id]
+            ]);
+        }
+
+        return $this->json($ad);
+    }
+
+    /**
+     * @Route("/api/delete_ad/{id}", name="ad_delete", methods={"POST"})
+     */
+    public function deleteAd(Request $request, $id): Response
+    {
+        $ad = $this->getDoctrine()
+            ->getManager()
+            ->getRepository(Ad::class)
+            ->findOneBy(['id' => $id]);
+        $JsonInput = json_decode($request->getContent(), true);
+        if ($ad === null or $ad->getAuthor() !== (int)$JsonInput['author'])
+        {
+            return $this->json([
+                'result' => 'error',
+                'message' => sprintf("Not found ad with id: %s", $id),
+                'date' => date('d-m-Y'),
+                'inputValue' => ['id' => $id]
+            ]);
+        }
+
+        $this->getDoctrine()->getManager()->remove($ad);
+        $this->getDoctrine()->getManager()->flush();
+
         return $this->json([
             'result' => 'success',
-            'message' => '',
-            'date' => date('d-m-Y')
+            'message' => "",
+            'date' => date('d-m-Y'),
+            'inputValue' => $JsonInput
         ]);
     }
 }
