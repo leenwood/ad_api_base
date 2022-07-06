@@ -3,6 +3,8 @@
 namespace App\Controller;
 
 use App\Entity\Ad;
+use App\Exception\jsonException;
+use App\Services\AdService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -13,6 +15,15 @@ use Symfony\Component\Routing\Annotation\Route;
 
 class MainApiController extends AbstractController
 {
+    private AdService $adService;
+    private jsonException $jsonException;
+    public function __construct(AdService $adService, jsonException $jsonException)
+    {
+        $this->jsonException = $jsonException;
+        $this->adService = $adService;
+    }
+
+
     /**
      * @Route("/api", name="app_main_api", methods={"GET"})
      */
@@ -39,21 +50,11 @@ class MainApiController extends AbstractController
         {
             $this->getDoctrine()->getManager()->persist($ad);
             $this->getDoctrine()->getManager()->flush($ad);
-            return $this->json([
-                'result' => 'success',
-                'message' => '',
-                'date' => date('d-m-Y'),
-                'inputValue' => $JsonInput
-            ]);
+            return $this->json($this->jsonException->jsonMessage(true, 'success add ad', $JsonInput));
         }
         else
         {
-            return $this->json([
-                'result' => 'error',
-                'message' => $adValidator->message(),
-                'date' => date('d-m-Y'),
-                'inputValue' => $JsonInput
-            ]);
+            return $this->json($this->jsonException->jsonMessage(false, $adValidator->message(), $JsonInput));
         }
     }
 
@@ -112,12 +113,7 @@ class MainApiController extends AbstractController
      */
     public function showAllAd(): Response
     {
-        $ads = $this->getDoctrine()
-            ->getManager()
-            ->getRepository(Ad::class)
-            ->findAll();
-
-        return $this->json($ads);
+        return $this->json($this->adService->getAllAd());
     }
 
     /**
@@ -125,18 +121,10 @@ class MainApiController extends AbstractController
      */
     public function showAd(Request $request, $id): Response
     {
-        $ad = $this->getDoctrine()
-            ->getManager()
-            ->getRepository(Ad::class)
-            ->findOneBy(['id' => $id]);
-        if ($ad === null)
+        $ad = $this->adService->getAdById($id);
+        if (!$ad->isAvailable())
         {
-            return $this->json([
-                'result' => 'error',
-                'message' => sprintf("Not found ad with id: %s", $id),
-                'date' => date('d-m-Y'),
-                'inputValue' => ['id' => $id]
-            ]);
+            return $this->json($this->jsonException->nullOrWrongIdAd($id));
         }
 
         return $this->json($ad);
